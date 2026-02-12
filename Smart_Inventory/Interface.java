@@ -3,6 +3,8 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.*;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
 
 public class Interface extends JFrame {
 
@@ -54,7 +56,36 @@ public class Interface extends JFrame {
 
         // --- ΠΙΝΑΚΑΣ ΠΡΟΪΟΝΤΩΝ ---
         String[] columnNames = {"Product Name", "Price", "Category", "Quantity"};
-        tableModel = new DefaultTableModel(columnNames, 0);
+        //tableModel = new DefaultTableModel(columnNames, 0);
+        tableModel = new DefaultTableModel(columnNames, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+        // Επιτρέπουμε την επεξεργασία σε όλα εκτός από το ID (αν είχες στήλη ID)
+        return true; 
+            }
+        };
+
+        tableModel.addTableModelListener(e -> {
+    // Ελέγχουμε αν η αλλαγή αφορά UPDATE σε γραμμή
+    if (e.getType() == TableModelEvent.UPDATE) {
+        int row = e.getFirstRow();
+        int column = e.getColumn();
+
+        // Προσοχή: Μην κάνεις loadTableData() εδώ μέσα!
+        try {
+            String name = tableModel.getValueAt(row, 0).toString();
+            double price = Double.parseDouble(tableModel.getValueAt(row, 1).toString());
+            String category = tableModel.getValueAt(row, 2).toString();
+            int quantity = Integer.parseInt(tableModel.getValueAt(row, 3).toString());
+
+            // Κλήση της μεθόδου SQL
+            updateDatabase(name, price, category, quantity);
+            System.out.println("Επιτυχές Update για το: " + name);
+        } catch (Exception ex) {
+            System.out.println("Σφάλμα μετατροπής: " + ex.getMessage());
+        }
+    }
+});
         productTable = new JTable(tableModel);
         JScrollPane sp = new JScrollPane(productTable);
         add(sp, BorderLayout.CENTER);
@@ -65,6 +96,10 @@ public class Interface extends JFrame {
 
         // Φόρτωση δεδομένων αμέσως
         loadTableData();
+
+        productTable = new JTable(tableModel);
+        productTable.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
+        
     }
 
 private void loadTableData() {
@@ -164,6 +199,30 @@ private void deleteFromDatabase(String name) {
     } catch (Exception e) {
         e.printStackTrace();
         JOptionPane.showMessageDialog(this, "Error deleting: " + e.getMessage());
+    }
+}
+
+private void updateDatabase(String name, double price, String category, int quantity) {
+    String sql = "UPDATE product SET price = ?, category = ?, quantity = ? WHERE name = ?";
+    
+    try (Connection conn = DBConnection.getConnection()) {
+        // Σιγουρευόμαστε ότι οι αλλαγές αποθηκεύονται αμέσως
+        conn.setAutoCommit(true); 
+        
+        try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setDouble(1, price);
+            pstmt.setString(2, category);
+            pstmt.setInt(3, quantity);
+            pstmt.setString(4, name);
+
+            int rowsAffected = pstmt.executeUpdate();
+            
+            if (rowsAffected == 0) {
+                System.out.println("⚠️ Προσοχή: Δεν βρέθηκε προϊόν με όνομα " + name);
+            }
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
     }
 }
 
