@@ -12,6 +12,7 @@ public class Interface extends JFrame {
     private JTextField categoryField; // Νέα μεταβλητή
     private JTextField qtyField;      // Νέα μεταβλητή
     private JButton submitButton;
+    private JButton delButton;
     private JTable productTable;
     private DefaultTableModel tableModel;
 
@@ -24,7 +25,7 @@ public class Interface extends JFrame {
         setLayout(new BorderLayout(10, 10));
 
         // --- ΦΟΡΜΑ ΕΙΣΑΓΩΓΗΣ ---
-        JPanel formPanel = new JPanel(new GridLayout(5, 2, 10, 10));
+        JPanel formPanel = new JPanel(new GridLayout(6, 2, 10, 10));
         formPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         formPanel.add(new JLabel("Product Name:"));
@@ -44,8 +45,10 @@ public class Interface extends JFrame {
         formPanel.add(qtyField);
 
         submitButton = new JButton("Save Product");
+        delButton = new JButton("Delete product");
         formPanel.add(new JLabel("")); // Κενό για στοίχιση
         formPanel.add(submitButton);
+        formPanel.add(delButton);
 
         add(formPanel, BorderLayout.NORTH);
 
@@ -58,6 +61,7 @@ public class Interface extends JFrame {
 
         // Events
         submitButton.addActionListener(e -> handleSave());
+        delButton.addActionListener(e->handleDelete());
 
         // Φόρτωση δεδομένων αμέσως
         loadTableData();
@@ -86,9 +90,9 @@ private void loadTableData() {
     }
 
     private void addProductToDatabase(String name, double price, String category, int quantity){
-                String sql = "INSERT INTO product (name, price, category, quantity) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO product (name, price, category, quantity) VALUES (?, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();
-         PreparedStatement pstmt = conn.prepareStatement(sql)){
+        PreparedStatement pstmt = conn.prepareStatement(sql)){
             // Αντικατάσταση των ερωτηματικών (?) με τις πραγματικές τιμές
         pstmt.setString(1, name);
         pstmt.setDouble(2, price);
@@ -124,6 +128,7 @@ private void loadTableData() {
 
         // 4. ΚΛΗΣΗ της μεθόδου SQL (Εδώ είναι που γίνεται το Insert!)
         addProductToDatabase(nameStr, priceValue, categoryStr, qtyValue);
+        //deleteFromDatabase(nameStr);
         
         // 5. Ενημέρωση UI
         JOptionPane.showMessageDialog(this, "Product saved successfully!");
@@ -138,6 +143,41 @@ private void loadTableData() {
     } catch (NumberFormatException e) {
         JOptionPane.showMessageDialog(this, "Price and Quantity must be valid numbers!");
     }
+}
+
+private void deleteFromDatabase(String name) {
+    String sql = "DELETE FROM product WHERE name = ?"; // Το (?) δεν χρειάζεται παρενθέσεις, αρκεί το ?
+    try (Connection conn = DBConnection.getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+        
+        pstmt.setString(1, name);
+        
+        // ΑΥΤΗ Η ΓΡΑΜΜΗ ΛΕΙΠΕΙ:
+        int rowsDeleted = pstmt.executeUpdate(); 
+        
+        if (rowsDeleted > 0) {
+            JOptionPane.showMessageDialog(this, "Product deleted successfully!");
+        } else {
+            JOptionPane.showMessageDialog(this, "Product not found!");
+        }
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        JOptionPane.showMessageDialog(this, "Error deleting: " + e.getMessage());
+    }
+}
+
+private void handleDelete() {
+    String nameStr = nameField.getText();
+
+    if (nameStr.isEmpty()) {
+        JOptionPane.showMessageDialog(this, "Please enter the Product Name to delete.");
+        return;
+    }
+
+    deleteFromDatabase(nameStr);
+    loadTableData(); // Ανανέωση πίνακα για να εξαφανιστεί η γραμμή
+    nameField.setText("");
 }
 
     public static void main(String[] args) {
